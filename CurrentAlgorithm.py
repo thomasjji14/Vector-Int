@@ -20,10 +20,8 @@ VALUE_INDEX = 2
 
 DEBUG_OUTPUT = True
 
-UNITS_PER_PIXEL = 10000
-
 # Load the image
-im = Image.open("testfiles/minibox/mini3.png").convert('RGBA')
+im = Image.open("testfiles/minibox/3x.png").convert('RGBA')
 pixelMap = im.load()
 
 pixelArrayCount = np.ones(im.size, dtype = int)
@@ -31,26 +29,6 @@ pixelArrayMax = np.ones(im.size, dtype = int)
 colorMap = [[[] for i in range(im.size[1])] for i in range(im.size[0])]
 
 basisPixels = []
-
-change = True
-maxNum = 0
-
-# Determine the pixel counts
-while change:
-    maxNum += 1
-    print("Iteration: "+str(maxNum))
-    change = False
-    oldArray = copy.deepcopy(pixelArrayCount)
-
-    for i in range(1, im.size[0]-1):
-        for j in range(1, im.size[1]-1):
-            pixel = pixelMap[i, j]
-            if not pixel[ALPHA_INDEX] == 0:
-                if checkSurrounding((i,j), pixelMap, oldArray):
-                    change = True
-                    pixelArrayCount[(i,j)] += 1
-
-print("Added Counts")
 
 # Generate reigons:
 splitColorReigons = []
@@ -60,10 +38,37 @@ for i in range(im.size[0]):
         for reigon in splitColorReigons:
             if (i,j) in reigon:
                 inReigon = True
-        if not inReigon:
+        if not inReigon and pixelMap[i,j][ALPHA_INDEX] != 0:
             splitColorReigons.append(floodFill(i,j, im.getpixel((i,j)), im))
+        
 
 print("Reigons Generated")
+
+# Generate counts based off of the previously determined regions
+for region in splitColorReigons:
+    change = True
+    localMax = 0
+    while change:
+        localMax += 1
+        change = False
+        oldArray = copy.deepcopy(pixelArrayCount)
+        analysisArray = copy.deepcopy(pixelArrayCount)
+        
+        for pixel in region:
+            if checkSurrounding(pixel, pixelMap, oldArray):
+                change = True
+                analysisArray[pixel] += 1
+        
+        if change:
+            # Check 1: Make sure all local maxima == localMax
+            # Check 2: Circular
+            change = localIsAbsoluteAndCircular(region, localMax + 1, analysisArray)
+
+            if change:
+                pixelArrayCount = analysisArray
+
+            
+np.savetxt("data.csv",pixelArrayCount)
 
 # Associate highest counts from each reigon
 for reigon in splitColorReigons:
@@ -77,31 +82,33 @@ for reigon in splitColorReigons:
 
 print("Highest Count Pixels Determined")
 
-
 basisPixelLocations = []
 for maxPixel in basisPixels:
     basisPixelLocations.append(maxPixel.location)
 
-for i in range(im.size[0]): 
+for i in range(im.size[0]):
+    print(str(i)+"/"+str(im.size[0]))
     for j in range(im.size[1]):
-        newPixels = []
-        
-        # Base pixels should not be altered
-        if (i,j) not in basisPixelLocations:
-            for maxPixel in basisPixels:
-                loc = maxPixel.location
-                pw = maxPixel.pixelWeight
+        # Ignore transparent pixels
+        if pixelMap[i,j][ALPHA_INDEX] == 0:
+            continue
 
-                originalColor = pw.color
-                originalWeight = pw.weight
-                if i == 10 and j == 10:
-                    print('d')
-                
+        newPixels = []
+        for maxPixel in basisPixels:
+            loc = maxPixel.location
+            pw = maxPixel.pixelWeight
+
+            originalColor = pw.color
+            originalWeight = pw.weight
+            
+            if not (i,j) == maxPixel.location:
                 newWeight = \
                     originalWeight/(maxPixel.getPixelSquareDistanceFrom((i,j)))
-
-                newPixels.append(pixelWeight(originalColor, newWeight))
-            pixelMap[i,j] = pixelWeight.averagePixels(newPixels, roundValues = True)
+                    
+            newPixels.append(pixelWeight(originalColor, newWeight))
+        
+        finalAveragedPixel = pixelWeight.averagePixels(newPixels, roundValues = True)
+        pixelMap[i,j] = finalAveragedPixel
 
 print("Colors finalized")
 

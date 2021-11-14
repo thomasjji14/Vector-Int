@@ -16,6 +16,8 @@ def checkSurrounding(pixelLocation, pixelMap, pixelArrayCount):
     pixelCount = pixelArrayCount[pixelLocation]
     for i in range(pixelLocation[0]-1, pixelLocation[0]+2):
         for j in range(pixelLocation[1]-1, pixelLocation[1]+2):
+            if i < 0 or j < 0 or i >= pixelArrayCount.shape[0] or j >= pixelArrayCount.shape[1]:
+                return False
             newPixel = pixelMap[i,j]
             newPixelCount = pixelArrayCount[i,j]
 
@@ -91,6 +93,25 @@ def isEdgePixel(pixelLocation, pixelMap):
                 return True
     return False
 
+def isBoundaryPixel(pixelLocation, pixelMap):
+    """
+    Returns true when the pixel is on the edge of the frame or has
+    neighbors that are not the same color as itself
+    """
+    pixel = pixelMap[pixelLocation]
+    for i in range(pixelLocation[0]-1, pixelLocation[0]+2):
+        for j in range(pixelLocation[1]-1, pixelLocation[1]+2):
+            # Case one: Has a neighbors with the edge (i.e. an OOB index)
+            if i < 0 or j < 0 or i >= pixelMap.size[0] or j >= pixelMap.size[1]:
+                return True
+
+            newPixel = pixelMap[(i,j)]
+            # Case two: Has a neighbor of a different color
+            if not pixel == newPixel:
+                print("unequalpixel!")
+                return True
+    return False
+
 def diminutiveFlood(x_loc, y_loc, color, im, pixelArrayMax, colormap):
     # def sigmoid(num, maxNum):
     #     factor = math.log(2*maxNum-1)/(maxNum-1)
@@ -148,4 +169,47 @@ def diminutiveFlood(x_loc, y_loc, color, im, pixelArrayMax, colormap):
         toFill.add(((x+1,y+1),count-1))
     return seenPositions
 
-# def generateComplement()
+def isLocalMaxPixel(position, countMap):
+    x = position[0]
+    y = position[1]
+    mainPixelCount = countMap[position]
+    
+    for i in range(x-1, x+2):
+        for j in range(y-1, y+2):
+            # Ignore the main pixel in the 3x3 grid around it
+            if (i,j) != position:
+                # Bounds checking
+                isPixelOutOfBounds = (i < 0 or j < 0 or i >= countMap.shape[0] or j >= countMap.shape[1])
+                if not isPixelOutOfBounds:
+                    newCount = countMap[(i,j)]
+                    if newCount > mainPixelCount:
+                        return False
+    return True
+
+def isCiruclarPixel(position, countMap):
+    x = position[0]
+    y = position[1]
+    mainPixelCount = countMap[position]
+    
+    for i in range(x-1, x+2):
+        for j in range(y-1, y+2):
+            # Ignore the main pixel in the 3x3 grid around it
+            if (i,j) != position:
+                # Bounds checking
+                isPixelOutOfBounds = (i < 0 or j < 0 or i >= countMap.shape[0] or j >= countMap.shape[1])
+                if not isPixelOutOfBounds:
+                    newCount = countMap[(i,j)]
+                    if newCount == mainPixelCount:
+                        return True
+    return False
+
+
+
+def localIsAbsoluteAndCircular(region, localMax, countArray):
+    for pixel in region:
+        if isLocalMaxPixel(pixel, countArray):
+            if not countArray[pixel] == localMax:
+                return False
+            if not isCiruclarPixel(pixel, countArray):
+                return False
+    return True
